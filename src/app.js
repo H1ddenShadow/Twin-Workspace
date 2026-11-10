@@ -435,7 +435,6 @@ class App {
                         let line = rawLine.trim();
                         if (!line) continue;
 
-                        // Handle Notion Callout (<aside> tags)
                         if (line.startsWith('<aside>')) {
                             inAside = true;
                             continue;
@@ -445,7 +444,7 @@ class App {
                             const textContent = asideBuffer
                                 .filter(l => !l.startsWith('<img') && !l.startsWith('</aside>'))
                                 .join(' ')
-                                .replace(/\*\*(.*?)\*\*/g, '$1')
+                                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                                 .trim();
                             if (textContent) {
                                 blocks.push({
@@ -463,33 +462,33 @@ class App {
                             continue;
                         }
 
-                        // Clean inline Markdown bold markers (**text**)
-                        let cleanText = line.replace(/\*\*(.*?)\*\*/g, '$1');
+                        // Properly define formattedText with HTML bold tags
+                        let formattedText = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
                         if (line.startsWith('# ')) {
                             blocks.push({
                                 id: 'b_' + Math.random().toString(36).substr(2, 9),
                                 type: 'h1',
-                                content: cleanText.replace(/^#\s+/, '')
+                                content: line.replace(/^#\s+/, '').replace(/\*\*(.*?)\*\*/g, '$1')
                             });
                         } else if (line.startsWith('- [ ]') || line.startsWith('- [x]')) {
                             blocks.push({
                                 id: 'b_' + Math.random().toString(36).substr(2, 9),
                                 type: 'todo',
-                                content: cleanText.replace(/^- \[[ x]\]\s*/, ''),
+                                content: formattedText.replace(/^- \[[ x]\]\s*/, ''),
                                 checked: line.startsWith('- [x]')
                             });
                         } else if (line.startsWith('- ') || line.startsWith('* ')) {
                             blocks.push({
                                 id: 'b_' + Math.random().toString(36).substr(2, 9),
                                 type: 'paragraph',
-                                content: '• ' + cleanText.replace(/^[-*]\s+/, '')
+                                content: '• ' + formattedText.replace(/^[-*]\s+/, '')
                             });
                         } else {
                             blocks.push({
                                 id: 'b_' + Math.random().toString(36).substr(2, 9),
                                 type: 'paragraph',
-                                content: cleanText
+                                content: formattedText
                             });
                         }
                     }
@@ -520,7 +519,7 @@ class App {
             console.error('Error importing Notion ZIP:', err);
             alert('Failed to import Notion ZIP archive.');
         }
-    }      
+    }
 
     exportTableCSV() {
         if (!this.currentDBRecords || this.currentDBRecords.length === 0) {
@@ -857,9 +856,9 @@ class App {
             text.className = `w-full outline-none text-sm empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 dark:empty:before:text-zinc-600 ${block.checked ? 'line-through text-slate-400' : ''}`;
             text.contentEditable = true;
             text.setAttribute('data-placeholder', 'To-do item...');
-            text.textContent = block.content;
+            text.innerHTML = block.content;
             text.oninput = async () => {
-                block.content = text.textContent;
+                block.content = text.innerHTML;
                 await this.cloud.syncItemUp(page);
                 this.channel.postMessage('sync');
             };
@@ -880,9 +879,9 @@ class App {
             contentEl.className = 'w-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded p-3 text-sm outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-amber-400';
             contentEl.contentEditable = true;
             contentEl.setAttribute('data-placeholder', 'Type callout text...');
-            contentEl.textContent = block.content;
+            contentEl.innerHTML = block.content;
             contentEl.oninput = async () => {
-                block.content = contentEl.textContent;
+                block.content = contentEl.innerHTML;
                 await this.cloud.syncItemUp(page);
                 this.channel.postMessage('sync');
             };
@@ -994,9 +993,9 @@ class App {
             contentEl.className = 'w-full text-sm outline-none text-slate-700 dark:text-slate-300 empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 dark:empty:before:text-zinc-600';
             contentEl.contentEditable = true;
             contentEl.setAttribute('data-placeholder', 'Type text...');
-            contentEl.textContent = block.content;
+            contentEl.innerHTML = block.content;
             contentEl.oninput = async () => {
-                block.content = contentEl.textContent;
+                block.content = contentEl.innerHTML;
                 await this.cloud.syncItemUp(page);
                 this.channel.postMessage('sync');
             };
@@ -1004,7 +1003,7 @@ class App {
 
         container.appendChild(contentEl);
         return container;
-    }
+    }  
 
     async addBlock(type) {
         if (!this.activeItemId) return;
