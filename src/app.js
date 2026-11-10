@@ -426,12 +426,73 @@ class App {
                     const fileName = parts[parts.length - 1];
                     const cleanTitle = fileName.replace(/\.md$/, '').replace(/\s+[a-f0-9]{32}$/, '');
                     
-                    const lines = content.split('\n').filter(l => l.trim().length > 0);
-                    const blocks = lines.map((line, idx) => ({
-                        id: 'b_' + Math.random().toString(36).substr(2, 9) + idx,
-                        type: line.startsWith('# ') ? 'h1' : 'paragraph',
-                        content: line.replace(/^#\s+/, '')
-                    }));
+                    const rawLines = content.split('\n');
+                    const blocks = [];
+                    let inAside = false;
+                    let asideBuffer = [];
+
+                    for (let rawLine of rawLines) {
+                        let line = rawLine.trim();
+                        if (!line) continue;
+
+                        // Handle Notion Callout (<aside> tags)
+                        if (line.startsWith('<aside>')) {
+                            inAside = true;
+                            continue;
+                        }
+                        if (line.endsWith('</aside>')) {
+                            inAside = false;
+                            const textContent = asideBuffer
+                                .filter(l => !l.startsWith('<img') && !l.startsWith('</aside>'))
+                                .join(' ')
+                                .replace(/\*\*(.*?)\*\*/g, '$1')
+                                .trim();
+                            if (textContent) {
+                                blocks.push({
+                                    id: 'b_' + Math.random().toString(36).substr(2, 9),
+                                    type: 'callout',
+                                    content: textContent
+                                });
+                            }
+                            asideBuffer = [];
+                            continue;
+                        }
+
+                        if (inAside) {
+                            asideBuffer.push(line);
+                            continue;
+                        }
+
+                        // Clean inline Markdown bold markers (**text**)
+                        let cleanText = line.replace(/\*\*(.*?)\*\*/g, '$1');
+
+                        if (line.startsWith('# ')) {
+                            blocks.push({
+                                id: 'b_' + Math.random().toString(36).substr(2, 9),
+                                type: 'h1',
+                                content: cleanText.replace(/^#\s+/, '')
+                            });
+                        } else if (line.startsWith('- [ ]') || line.startsWith('- [x]')) {
+                            blocks.push({
+                                id: 'b_' + Math.random().toString(36).substr(2, 9),
+                                type: 'todo',
+                                content: cleanText.replace(/^- \[[ x]\]\s*/, ''),
+                                checked: line.startsWith('- [x]')
+                            });
+                        } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                            blocks.push({
+                                id: 'b_' + Math.random().toString(36).substr(2, 9),
+                                type: 'paragraph',
+                                content: '• ' + cleanText.replace(/^[-*]\s+/, '')
+                            });
+                        } else {
+                            blocks.push({
+                                id: 'b_' + Math.random().toString(36).substr(2, 9),
+                                type: 'paragraph',
+                                content: cleanText
+                            });
+                        }
+                    }
 
                     if (blocks.length === 0) {
                         blocks.push({ id: 'b_1', type: 'paragraph', content: '' });
@@ -459,7 +520,7 @@ class App {
             console.error('Error importing Notion ZIP:', err);
             alert('Failed to import Notion ZIP archive.');
         }
-    }
+    }      
 
     exportTableCSV() {
         if (!this.currentDBRecords || this.currentDBRecords.length === 0) {
